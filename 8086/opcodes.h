@@ -1,11 +1,12 @@
-enum AddressMode {
+// https://www.tutorialspoint.com/microprocessor/microprocessor_8086_addressing_modes.htm
+enum AddressingMode {
   Immedate,
-  Direct,
   Register,
+  Direct,
   RegisterIndirect,
+  Based,
   Indexed,
-  RegisterRelative,
   BasedIndexed,
-  RelativeBasedIndexed,
+  BasedIndexedWithDisplacement,
 };
 
