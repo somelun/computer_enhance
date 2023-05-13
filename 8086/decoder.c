@@ -73,11 +73,30 @@ int main(int argc,  char* argv[argc + 1]) {
 
   FILE* input = fopen(argv[1], "rb");
   if (!input) {
-    perror("fopen for input file failed");
+    perror("fopen for input file failed\n");
     return EXIT_FAILURE;
   }
 
   printf("bits 16\n\n");
+
+  fseek(input, 0L, SEEK_END);
+  size_t input_size = ftell(input);
+  rewind(input);
+
+  if (input_size < 1) {
+    printf("%s was empty, nothing to do\n", argv[1]);
+    fclose(input);
+    return EXIT_SUCCESS;
+  }
+
+  u8* content = (u8*)malloc(input_size * sizeof(u8*));
+  fread(content, input_size, 1, input);
+
+  //
+
+  fclose(input);
+
+  return EXIT_SUCCESS;
 
   // loop for the buffer inside input loop
   u8 buffer;
