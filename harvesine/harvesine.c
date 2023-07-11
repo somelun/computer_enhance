@@ -4,29 +4,22 @@
 #include <string.h> // strcmp
 #include <stddef.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 
-#define TOKENS_COUNT 255
 #define EARTH_RADIUS 6372.8
+
 typedef char              u8;
 typedef unsigned long int u64;
 typedef long int          i64;
 typedef double            f64;
 
 typedef enum {
-  // invalid,        // not initialized
   number,         // any number
   string,         // any string in ""
-  // comma,          // ,
-  // colon,          // :
-  // semicolon,      // ;
-  // brace_open,     // {
-  // brace_close,    // }
-  // bracket_open,   // [
-  // bracket_close,  // ]
 } token_t;
 
 struct buffer_t {
-  i64 size;
+  u64 size;
   u8* data;
 };
 
@@ -49,7 +42,7 @@ struct token_item_t lex_string(const struct buffer_t* const buffer, u64* offset)
 struct token_item_t lex_number(const struct buffer_t* const buffer, u64* offset);
 
 // tokens parser
-void parser(const struct buffer_t* const buffer, const struct token_item_t* const tokens, struct coords_t* pairs);
+void parser(const struct buffer_t* const buffer, const struct token_item_t* const tokens, const u64 tokens_size, struct coords_t* pairs);
 void parse_string(const struct buffer_t* const buffer, const u64 begin, const u64 end);
 f64 parse_number(const struct buffer_t* const buffer, const u64 begin, const u64 end);
 
@@ -74,9 +67,17 @@ int main(int argc, char* argv[argc +1]) {
 
   // load entire json file into the memory
   struct buffer_t buffer;
-  fseek(input, 0, SEEK_END);
-  buffer.size = ftell(input);
-  fseek(input, 0, SEEK_SET);
+  // fseek(input, 0, SEEK_END);
+  // buffer.size = ftell(input);
+  // fseek(input, 0, SEEK_SET);
+
+  struct stat input_stat;
+  stat(argv[1], &input_stat);
+
+  buffer.size = input_stat.st_size;
+
+  // printf("%lu\n", buffer.size);
+  // return 0;
 
   buffer.data = malloc(sizeof(u8) * (buffer.size + 1));
   fread(buffer.data, 1, buffer.size, input);
@@ -85,21 +86,31 @@ int main(int argc, char* argv[argc +1]) {
   // null terminatig the buffer
   buffer.data[buffer.size] = 0;
 
-  struct token_item_t* tokens = malloc(sizeof(struct token_item_t) * TOKENS_COUNT);
+  const u64 count = input_stat.st_size / 8;
+
+  struct token_item_t* tokens = malloc(sizeof(struct token_item_t) * count);
 
   lexer(&buffer, tokens);
 
-  u64 pairs_count = TOKENS_COUNT / 4;
+  u64 pairs_count = count / 4;
   struct coords_t* pairs = malloc(sizeof(struct coords_t) * pairs_count);
 
-  parser(&buffer, tokens, pairs);
+  // printf("%lu\n", pairs_count);
+  parser(&buffer, tokens, count, pairs);
 
+  f64 average;
+  u64 average_count;
   for (u64 i = 0; i < pairs_count; ++i) {
       f64 answer = reference_haversine(pairs[i].a, pairs[i].b, pairs[i].c, pairs[i].d, EARTH_RADIUS);
       if (answer > 0.0) {
-        printf("%f\n", answer);
+        // printf("%f\n", answer);
+        average += answer;
+        average_count++;
       }
   }
+
+  average = average / average_count;
+  printf("%f\n", average);
 
   free(pairs);
   free(tokens);
@@ -192,12 +203,12 @@ struct token_item_t lex_number(const struct buffer_t* const buffer, u64* offset)
   return token_item;
 }
 
-void parser(const struct buffer_t* const buffer, const struct token_item_t* const tokens, struct coords_t* pairs) {
+void parser(const struct buffer_t* const buffer, const struct token_item_t* const tokens,const u64 tokens_size, struct coords_t* pairs) {
   struct coords_t coords;
   u8 counter = 0;
   u64 n = 0;
   f64 value = 0.0;
-  for (size_t i = 0; i <= TOKENS_COUNT; ++i) {
+  for (size_t i = 0; i <= tokens_size; ++i) {
     switch(tokens[i].token) {
       //
       case string: {

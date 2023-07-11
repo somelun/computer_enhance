@@ -26,7 +26,10 @@ int main(int argc, char* argv[argc + 1]) {
     fprintf(stderr, "error - argv[2] (count) not an integer");
   }
 
-  FILE* output = fopen("coords.json", "w");
+  char output_name[64];
+  snprintf(output_name, sizeof(output_name), "coords_%d.json", count);
+
+  FILE* output = fopen(output_name, "w");
   fprintf(output, "{\"pairs\":[\n");
 
   for (i32 i = 0; i < count - 1; ++i) {
