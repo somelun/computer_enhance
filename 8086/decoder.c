@@ -2,10 +2,10 @@
 #include "stdio.h"
 #include "string.h"
 
-typedef uint8_t  u8;
-typedef int8_t   i8;
-typedef int16_t  i16;
-typedef uint16_t u16;
+#include "types.h"
+#include "memory.h"
+#include "decode_data.h"
+
 
 // byte 1 format
 #define MASK_D      0b00000010 // 1 bit
@@ -71,30 +71,36 @@ int main(int argc,  char* argv[argc + 1]) {
     return EXIT_FAILURE;
   }
 
+  struct decodeData decode_data;
+  bool r = dd_init_with_file(&decode_data, argv[1]);
+  dd_deinit(&decode_data);
+
+
   FILE* input = fopen(argv[1], "rb");
-  if (!input) {
-    perror("fopen for input file failed\n");
-    return EXIT_FAILURE;
-  }
+  // if (!input) {
+  //   perror("fopen for input file failed\n");
+  //   return EXIT_FAILURE;
+  // }
 
   printf("bits 16\n\n");
 
-  fseek(input, 0L, SEEK_END);
-  size_t input_size = ftell(input);
-  rewind(input);
+  // fseek(input, 0L, SEEK_END);
+  // size_t input_size = ftell(input);
+  // rewind(input);
+  // 
+  // if (input_size < 1) {
+  //   printf("%s was empty, nothing to do\n", argv[1]);
+  //   fclose(input);
+  //   return EXIT_SUCCESS;
+  // }
+  // 
+  // u8* content = (u8*)malloc(input_size * sizeof(u8*));
+  // fread(content, input_size, 1, input);
 
-  if (input_size < 1) {
-    printf("%s was empty, nothing to do\n", argv[1]);
-    fclose(input);
-    return EXIT_SUCCESS;
-  }
+  struct memory m;
+  bool result = init_from_file(&m, argv[1]);
 
-  u8* content = (u8*)malloc(input_size * sizeof(u8*));
-  fread(content, input_size, 1, input);
-
-  //
-
-  fclose(input);
+  // fclose(input);
 
   return EXIT_SUCCESS;
 

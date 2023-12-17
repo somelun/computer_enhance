@@ -6,30 +6,32 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
+#include "timers.h"
+
 #define EARTH_RADIUS 6372.8
 
-typedef char              u8;
-typedef unsigned long int u64;
-typedef long int          i64;
-typedef double            f64;
+typedef char          u8;
+typedef unsigned long u64;
+typedef long          i64;
+typedef double        f64;
 
 typedef enum {
   number,         // any number
   string,         // any string in ""
-} token_t;
+} t_token;
 
-struct buffer_t {
+struct t_buffer {
   u64 size;
   u8* data;
 };
 
-struct token_item_t {
-  token_t token;
+struct t_token_item {
+  t_token token;
   u64 begin;
   u64 end;
 };
 
-struct coords_t {
+struct t_coords {
   f64 a;
   f64 b;
   f64 c;
@@ -37,14 +39,14 @@ struct coords_t {
 };
 
 // json tokeniser
-void lexer(const struct buffer_t* const buffer, struct token_item_t* tokens);
-struct token_item_t lex_string(const struct buffer_t* const buffer, u64* offset);
-struct token_item_t lex_number(const struct buffer_t* const buffer, u64* offset);
+void lexer(const struct t_buffer* const buffer, struct t_token_item* tokens);
+struct t_token_item lex_string(const struct t_buffer* const buffer, u64* offset);
+struct t_token_item lex_number(const struct t_buffer* const buffer, u64* offset);
 
 // tokens parser
-void parser(const struct buffer_t* const buffer, const struct token_item_t* const tokens, const u64 tokens_size, struct coords_t* pairs);
-void parse_string(const struct buffer_t* const buffer, const u64 begin, const u64 end);
-f64 parse_number(const struct buffer_t* const buffer, const u64 begin, const u64 end);
+void parser(const struct t_buffer* const buffer, const struct t_token_item* const tokens, const u64 tokens_size, struct t_coords* pairs);
+void parse_string(const struct t_buffer* const buffer, const u64 begin, const u64 end);
+f64 parse_number(const struct t_buffer* const buffer, const u64 begin, const u64 end);
 
 // harvesine calculations
 f64 reference_haversine(f64 x0, f64 y0, f64 x1, f64 y1, f64 earth_radius);
@@ -53,20 +55,24 @@ f64 reference_haversine(f64 x0, f64 y0, f64 x1, f64 y1, f64 earth_radius);
 f64 square(f64 a);
 f64 degrees_to_radians(f64 degrees);
 
-void print_token(const struct buffer_t* const buffer, const struct token_item_t* const token_item);
+void print_token(const struct t_buffer* const buffer, const struct t_token_item* const token_item);
+void print_time_elapsed(const char* text, u64 total_time, u64 begin, u64 end);
 
 int main(int argc, char* argv[argc +1]) {
+  const u64 profile_begin = read_cpu_timer();
+
   FILE* input = NULL;
   if (argc > 1) {
     input = fopen(argv[1], "rb");
   }
 
   if (input == NULL) {
+    printf("No input files!\n");
     return EXIT_FAILURE;
   }
 
   // load entire json file into the memory
-  struct buffer_t buffer;
+  struct t_buffer buffer;
   // fseek(input, 0, SEEK_END);
   // buffer.size = ftell(input);
   // fseek(input, 0, SEEK_SET);
@@ -76,30 +82,36 @@ int main(int argc, char* argv[argc +1]) {
 
   buffer.size = input_stat.st_size;
 
-  // printf("%lu\n", buffer.size);
-  // return 0;
+  const u64 profile_read = read_cpu_timer();
 
   buffer.data = malloc(sizeof(u8) * (buffer.size + 1));
   fread(buffer.data, 1, buffer.size, input);
   fclose(input);
+
+  const u64 profile_misc = read_cpu_timer();
 
   // null terminatig the buffer
   buffer.data[buffer.size] = 0;
 
   const u64 count = input_stat.st_size / 8;
 
-  struct token_item_t* tokens = malloc(sizeof(struct token_item_t) * count);
+  struct t_token_item* tokens = malloc(sizeof(struct t_token_item) * count);
+
+  const u64 profile_lexer = read_cpu_timer();
+
+  u64 pairs_count = count / 4;
+  struct t_coords* pairs = malloc(sizeof(struct t_coords) * pairs_count);
 
   lexer(&buffer, tokens);
 
-  u64 pairs_count = count / 4;
-  struct coords_t* pairs = malloc(sizeof(struct coords_t) * pairs_count);
+  const u64 profile_parser = read_cpu_timer();
 
-  // printf("%lu\n", pairs_count);
   parser(&buffer, tokens, count, pairs);
 
-  f64 average;
-  u64 average_count;
+  const u64 profile_harv = read_cpu_timer();
+
+  f64 average = 0.0f;
+  u64 average_count = 0;
   for (u64 i = 0; i < pairs_count; ++i) {
       f64 answer = reference_haversine(pairs[i].a, pairs[i].b, pairs[i].c, pairs[i].d, EARTH_RADIUS);
       if (answer > 0.0) {
@@ -109,29 +121,39 @@ int main(int argc, char* argv[argc +1]) {
       }
   }
 
+  const u64 profile_end = read_cpu_timer();
+
   average = average / average_count;
-  printf("%f\n", average);
+  printf("Harvesine distance is %f\n", average);
 
   free(pairs);
   free(tokens);
   free(buffer.data);
 
+  const f64 freq = (f64)get_cpu_freq();
+
+  u64 timer_total = profile_end - profile_begin;
+
+  printf("total time : %f\n", timer_total / freq);
+
+  print_time_elapsed("startup", timer_total, profile_begin, profile_read);
+  print_time_elapsed("read", timer_total, profile_read, profile_misc);
+  print_time_elapsed("lexer", timer_total, profile_lexer, profile_parser);
+  print_time_elapsed("parser", timer_total, profile_parser, profile_harv);
+  print_time_elapsed("harvesine", timer_total, profile_harv, profile_end);
+
   return EXIT_SUCCESS;
 }
 
-void lexer(const struct buffer_t* const buffer, struct token_item_t* tokens) {
-  const char json_header[] = "{\"pairs\":[\n";
-
+void lexer(const struct t_buffer* const buffer, struct t_token_item* tokens) {
   u64 offset = 11;
   u64 index = 0;
   while (offset++ < buffer->size) {
     switch (buffer->data[offset]) {
-      // struct token_item_t token_item = { .token = invalid, .begin = 0, .end = 0 };
-
       //
       // if we see " then we found string
       case '"': {
-        struct token_item_t token_item = lex_string(buffer, &offset);
+        struct t_token_item token_item = lex_string(buffer, &offset);
         tokens[index++] = token_item;
         break;
       }
@@ -148,33 +170,22 @@ void lexer(const struct buffer_t* const buffer, struct token_item_t* tokens) {
       case '7':
       case '8':
       case '9': {
-        struct token_item_t token_item = lex_number(buffer, &offset);
+        struct t_token_item token_item = lex_number(buffer, &offset);
         tokens[index++] = token_item;
         break;
       }
       //
-      // just comma
-      case ',': {
-        // struct token_item_t token_item = { .token = comma, .begin = offset, .end = offset };
-        // tokens[index++] = token_item;
-        // break;
-      }
-      // just colon
-      case ':': {
-        // struct token_item_t token_item = { .token = colon, .begin = offset, .end = offset };
-        // tokens[index++] = token_item;
-        // break;
-      }
-      //
-      // everything we ignore
+      // everything else we ignore
+      case ',':
+      case ':':
       case ' ':
       default: break;
     }
   }
 }
 
-struct token_item_t lex_string(const struct buffer_t* const buffer, u64* offset) {
-  struct token_item_t token_item;
+struct t_token_item lex_string(const struct t_buffer* const buffer, u64* offset) {
+  struct t_token_item token_item;
   token_item.token = string;
 
   token_item.begin = (*offset) + 1;
@@ -188,8 +199,8 @@ struct token_item_t lex_string(const struct buffer_t* const buffer, u64* offset)
   return token_item;
 }
 
-struct token_item_t lex_number(const struct buffer_t* const buffer, u64* offset) {
-  struct token_item_t token_item;
+struct t_token_item lex_number(const struct t_buffer* const buffer, u64* offset) {
+  struct t_token_item token_item;
   token_item.token = number;
 
   token_item.begin = (*offset);
@@ -203,8 +214,8 @@ struct token_item_t lex_number(const struct buffer_t* const buffer, u64* offset)
   return token_item;
 }
 
-void parser(const struct buffer_t* const buffer, const struct token_item_t* const tokens,const u64 tokens_size, struct coords_t* pairs) {
-  struct coords_t coords;
+void parser(const struct t_buffer* const buffer, const struct t_token_item* const tokens,const u64 tokens_size, struct t_coords* pairs) {
+  struct t_coords coords;
   u8 counter = 0;
   u64 n = 0;
   f64 value = 0.0;
@@ -250,10 +261,10 @@ void parser(const struct buffer_t* const buffer, const struct token_item_t* cons
   }
 }
 
-void parse_string(const struct buffer_t* const buffer, const u64 begin, const u64 end) {
+void parse_string(const struct t_buffer* const buffer, const u64 begin, const u64 end) {
 }
 
-f64 parse_number(const struct buffer_t* const buffer, const u64 begin, const u64 end) {
+f64 parse_number(const struct t_buffer* const buffer, const u64 begin, const u64 end) {
   bool fractional = false;
 
   f64 value = 0.0;
@@ -324,10 +335,16 @@ f64 degrees_to_radians(f64 degrees) {
   return result;
 }
 
-void print_token(const struct buffer_t* const buffer, const struct token_item_t* const token_item) {
+void print_token(const struct t_buffer* const buffer, const struct t_token_item* const token_item) {
   for (size_t i = token_item->begin; i <= token_item->end; ++i) {
     printf("%c", buffer->data[i]);
   }
   printf(" ");
+}
+
+void print_time_elapsed(const char* label, u64 total_time, u64 begin, u64 end) {
+  u64 elapsed = end - begin;
+  f64 percent = 100.0 * ((f64)elapsed / (f64)total_time);
+  printf("  %s: %lu (%.2f%%)\n", label, elapsed, percent);
 }
 
