@@ -23,26 +23,20 @@ static inline unsigned long get_os_timer_freq() {
 }
 
 static inline unsigned long read_os_timer() {
-  return 0;
+  return mach_absolute_time();
 }
 
 static inline unsigned long read_cpu_timer() {
-  // uint64_t start = mach_absolute_time();
-  // uint64_t stop = mach_absolute_time();
-  //
-
   return __rdtsc();
 }
 
-// unsigned __int64 inline GetRDTSC() {
-//    __asm {
-//       ; Flush the pipeline
-//       XOR eax, eax
-//       CPUID
-//       ; Get RDTSC counter in edx:eax
-//       RDTSC
-//    }
-// }
+// just an experiment, but it gives the same result as __rdtcs()
+static inline unsigned long asm_rdtsc() {
+  unsigned hi, lo;
+  __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+
+  return ((unsigned long long)lo) | ( ((unsigned long long)hi) << 32);
+}
 
 #endif // TIMERS_H
 
