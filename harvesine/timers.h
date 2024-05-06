@@ -20,11 +20,10 @@ static inline unsigned long get_cpu_freq() {
   }
 
   return freq;
-
 #elif defined(__aarch64__)
-  uint64_t val;
-  __asm__ volatile("mrs %0, cntfrq_el0" : "=r" (val));
-  return val;
+  uint64_t freq;
+  __asm__ volatile("mrs %0, cntfrq_el0" : "=r" (freq));
+  return freq;
 #endif
 }
 
@@ -41,7 +40,6 @@ static inline unsigned long read_cpu_timer() {
   return __rdtsc();
 #elif defined(__aarch64__)
   uint64_t val;
-  // use isb to avoid speculative read of cntvct_el0
   __asm__ volatile("isb;\n\tmrs %0, cntvct_el0" : "=r" (val) :: "memory");
   return val;
 #endif
