@@ -1,5 +1,5 @@
 build:
-	gcc -Wall harvesine.c -o harvesine
+	clang++ -Wall harvesine.cpp -o harvesine
 
 run:
 	./harvesine
