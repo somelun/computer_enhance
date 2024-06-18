@@ -1,5 +1,5 @@
-#ifndef TIMERS_H
-#define TIMERS_H
+#ifndef _TIMERS_H_
+#define _TIMERS_H_
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -55,5 +55,5 @@ static inline unsigned long asm_rdtsc() {
 }
 #endif
 
-#endif // TIMERS_H
+#endif // _TIMERS_H_
 

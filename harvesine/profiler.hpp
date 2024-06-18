@@ -1,62 +1,50 @@
-#ifndef PROFILER_HPP_
-#define PROFILER_HPP_
+#ifndef _PROFILER_HPP_
+#define _PROFILER_HPP_
 
 #include "types.h"
 #include "timers.h"
 
 #include <stdio.h>
 
-// struct profiler_entry {
-//   profiler_entry() {
-//     start = read_cpu_timer();
-//   }
-// 
-//   ~profiler_entry() {
-//     end = read_cpu_timer();
-//   }
-// 
-//   uint16_t start;
-//   uint16_t end;
-//   const char* label;
-// };
-// 
-// struct profiler {
-//   struct profiler_entry entries[128];
-// 
-// };
-// 
-// static struct profiler global_profiler;
+#define ARRAY_COUNT(Array) (sizeof(Array) / sizeof((Array)[0]))
 
-// #define 
-//
-
-#define ArrayCount(Array) (sizeof(Array)/sizeof((Array)[0]))
-
-struct profile_anchor {
+struct ProfileAnchor {
   u64 elapsed;
+  u64 elapsed_children;
   u64 hit_count;
   const char* label;
 };
 
-struct profiler {
-  profile_anchor anchors[4096];
+struct Profiler {
+  ProfileAnchor anchors[4096];
 
   u64 start;
   u64 end;
 };
-static profiler global_profiler;
+
+static Profiler global_profiler;
+static u32 global_profiler_parent;
 
 struct profile_block {
   profile_block(const char* label_, u32 index_) {
+    parent = global_profiler_parent;
+
     index = index_;
     label = label_;
+
+    global_profiler_parent = index_;
+
     start = read_cpu_timer();
   }
 
   ~profile_block(void) {
     u64 elapsed = read_cpu_timer() - start;
+    global_profiler_parent = parent;
 
-    profile_anchor *anchor = global_profiler.anchors + index;
+    ProfileAnchor *parent_anchor = global_profiler.anchors + parent;
+    parent_anchor->elapsed_children += elapsed;
+
+    ProfileAnchor *anchor = global_profiler.anchors + index;
     anchor->elapsed += elapsed;
     ++anchor->hit_count;
 
@@ -66,17 +54,25 @@ struct profile_block {
   const char* label;
   u64 start;
   u32 index;
+  u32 parent;
 };
 
-#define NameConcat2(A, B) A##B
-#define NameConcat(A, B) NameConcat2(A, B)
-#define TimeBlock(Name) profile_block NameConcat(Block, __LINE__)(Name, __COUNTER__ + 1);
-#define TimeFunction TimeBlock(__func__)
+#define NAME_CONCAT_NX(A, B) A##B
+#define NAME_CONCAT(A, B) NAME_CONCAT_NX(A, B)
+#define TIME_BLOCK(Name) profile_block NAME_CONCAT(Block, __LINE__)(Name, __COUNTER__ + 1);
+#define TimeFunction TIME_BLOCK(__func__)
 
-static void PrintTimeElapsed(u64 total_elapsed, profile_anchor *anchor) {
-  u64 elapsed = anchor->elapsed;
+static void PrintTimeElapsed(u64 total_elapsed, ProfileAnchor *anchor) {
+  u64 elapsed = anchor->elapsed - anchor->elapsed_children;
   f64 percent = 100.0 * ((f64)elapsed / (f64)total_elapsed);
-  printf("  %s[%lu]: %lu (%.2f%%)\n", anchor->label, anchor->hit_count, elapsed, percent);
+
+  printf("  %s[%lu]: %lu (%.2f%%", anchor->label, anchor->hit_count, elapsed, percent);
+
+  if (anchor->elapsed_children) {
+    f64 percent_with_children = 100.0 * ((f64)anchor->elapsed / (f64)total_elapsed);
+    printf(", %.2f%% with children", percent_with_children);
+  }
+  printf(")\n");
 }
 
 static void BeginProfile(void) {
@@ -93,13 +89,13 @@ static void EndAndPrintProfile() {
     printf("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)TotalCPUElapsed / (f64)cpu_freq, cpu_freq);
   }
 
-  for (u32 AnchorIndex = 0; AnchorIndex < ArrayCount(global_profiler.anchors); ++AnchorIndex) {
-    profile_anchor *Anchor = global_profiler.anchors + AnchorIndex;
+  for (u32 AnchorIndex = 0; AnchorIndex < ARRAY_COUNT(global_profiler.anchors); ++AnchorIndex) {
+    ProfileAnchor *Anchor = global_profiler.anchors + AnchorIndex;
     if (Anchor->elapsed) {
       PrintTimeElapsed(TotalCPUElapsed, Anchor);
     }
   }
 }
 
-#endif
+#endif // _PROFILER_HPP_
 
