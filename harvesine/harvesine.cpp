@@ -1,6 +1,8 @@
 #include <math.h>
 #include <sys/stat.h>
 
+#define PROFILER 1
+
 #include "types.h"      // custom type aliases
 #include "profiler.hpp" // custom profiler
 
@@ -62,9 +64,12 @@ int main(int argc, char* argv[argc +1]) {
 
   buffer.size = input_stat.st_size;
 
-  buffer.data = (u8*)malloc(sizeof(u8) * (buffer.size + 1));
-  fread(buffer.data, 1, buffer.size, input);
-  fclose(input);
+  {
+    TIME_BLOCK("read file")
+    buffer.data = (u8*)malloc(sizeof(u8) * (buffer.size + 1));
+    fread(buffer.data, 1, buffer.size, input);
+    fclose(input);
+  }
 
   // null terminatig the buffer
   buffer.data[buffer.size] = 0;
@@ -93,9 +98,12 @@ int main(int argc, char* argv[argc +1]) {
   average = average / average_count;
   printf("Harvesine distance is %f\n", average);
 
-  free(pairs);
-  free(tokens);
-  free(buffer.data);
+  {
+    TIME_BLOCK("free buffers")
+    free(pairs);
+    free(tokens);
+    free(buffer.data);
+  }
 
   EndAndPrintProfile();
 
@@ -103,7 +111,7 @@ int main(int argc, char* argv[argc +1]) {
 }
 
 void lexer(const struct Buffer* const buffer, struct TokenItem* tokens) {
-  TimeFunction;
+  TIME_FUNC;
 
   u64 offset = 11;
   u64 index = 0;
@@ -136,7 +144,7 @@ void lexer(const struct Buffer* const buffer, struct TokenItem* tokens) {
 }
 
 struct TokenItem lex_number(const struct Buffer* const buffer, u64* offset) {
-  TimeFunction;
+  TIME_FUNC;
 
   struct TokenItem token_item;
 
@@ -152,7 +160,7 @@ struct TokenItem lex_number(const struct Buffer* const buffer, u64* offset) {
 }
 
 void parser(const struct Buffer* const buffer, const struct TokenItem* const tokens,const u64 tokens_size, struct Coords* pairs) {
-  TimeFunction;
+  TIME_FUNC;
 
   struct Coords coords;
   u8 counter = 0;
@@ -189,7 +197,7 @@ void parser(const struct Buffer* const buffer, const struct TokenItem* const tok
 }
 
 f64 parse_number(const struct Buffer* const buffer, const u64 begin, const u64 end) {
-  TimeFunction;
+  TIME_FUNC;
 
   bool fractional = false;
 
@@ -232,7 +240,7 @@ f64 reference_haversine(f64 x0, f64 y0, f64 x1, f64 y1, f64 earth_radius) {
   //  Instead, it attempts to follow, as closely as possible, the formula used in the real-world
   //  question on which these homework exercises are loosely based.
 
-  TimeFunction;
+  TIME_FUNC;
 
   f64 lat1 = y0;
   f64 lat2 = y1;
