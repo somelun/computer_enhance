@@ -9,8 +9,8 @@
 #define ARRAY_COUNT(Array) (sizeof(Array) / sizeof((Array)[0]))
 
 struct ProfileAnchor {
-  u64 elapsed;
-  u64 elapsed_children;
+  u64 elapsed_exclusive; // does not include children
+  u64 elapsed_inclusive; // does include children
   u64 hit_count;
   const char* label;
 };
@@ -32,6 +32,9 @@ struct profile_block {
     index = index_;
     label = label_;
 
+    ProfileAnchor *anchor = global_profiler.anchors + index;
+    old_elapsed_inclusive = anchor->elapsed_inclusive;
+
     global_profiler_parent = index_;
 
     start = read_cpu_timer();
@@ -42,16 +45,18 @@ struct profile_block {
     global_profiler_parent = parent;
 
     ProfileAnchor *parent_anchor = global_profiler.anchors + parent;
-    parent_anchor->elapsed_children += elapsed;
+    parent_anchor->elapsed_exclusive -= elapsed;
 
     ProfileAnchor *anchor = global_profiler.anchors + index;
-    anchor->elapsed += elapsed;
+    anchor->elapsed_exclusive += elapsed;
+    anchor->elapsed_inclusive = old_elapsed_inclusive + elapsed;
     ++anchor->hit_count;
 
     anchor->label = label;
   }
 
   const char* label;
+  u64 old_elapsed_inclusive;
   u64 start;
   u32 index;
   u32 parent;
@@ -63,13 +68,12 @@ struct profile_block {
 #define TimeFunction TIME_BLOCK(__func__)
 
 static void PrintTimeElapsed(u64 total_elapsed, ProfileAnchor *anchor) {
-  u64 elapsed = anchor->elapsed - anchor->elapsed_children;
-  f64 percent = 100.0 * ((f64)elapsed / (f64)total_elapsed);
+  f64 percent = 100.0 * ((f64)anchor->elapsed_exclusive / (f64)total_elapsed);
 
-  printf("  %s[%lu]: %lu (%.2f%%", anchor->label, anchor->hit_count, elapsed, percent);
+  printf("  %s[%lu]: %lu (%.2f%%", anchor->label, anchor->hit_count, anchor->elapsed_exclusive, percent);
 
-  if (anchor->elapsed_children) {
-    f64 percent_with_children = 100.0 * ((f64)anchor->elapsed / (f64)total_elapsed);
+  if (anchor->elapsed_inclusive != anchor->elapsed_exclusive) {
+    f64 percent_with_children = 100.0 * ((f64)anchor->elapsed_inclusive / (f64)total_elapsed);
     printf(", %.2f%% with children", percent_with_children);
   }
   printf(")\n");
@@ -91,7 +95,7 @@ static void EndAndPrintProfile() {
 
   for (u32 AnchorIndex = 0; AnchorIndex < ARRAY_COUNT(global_profiler.anchors); ++AnchorIndex) {
     ProfileAnchor *Anchor = global_profiler.anchors + AnchorIndex;
-    if (Anchor->elapsed) {
+    if (Anchor->elapsed_inclusive) {
       PrintTimeElapsed(TotalCPUElapsed, Anchor);
     }
   }
