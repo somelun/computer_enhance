@@ -10,8 +10,21 @@
 #include <x86intrin.h>
 #endif
 
-static inline unsigned long get_cpu_freq() {
 #if defined(__x86_64__)
+
+static inline uint64_t read_os_timer_freq() {
+  LARGE_INTEGER freq;
+  QueryPerformanceFrequency(&freq);
+  return freq.QuadPart;
+}
+
+static inline uint64_t read_os_timer() {
+  LARGE_INTEGER value;
+  QueryPerformanceCounter(&value);
+  return value.QuadPart;
+}
+
+static inline uint64_t read_cpu_freq() {
   uint64_t freq = 0;
   size_t size = sizeof(freq);
 
@@ -20,39 +33,42 @@ static inline unsigned long get_cpu_freq() {
   }
 
   return freq;
+}
+
+static inline uint64_t read_cpu_timer() {
+  return __rdtsc();
+}
+
+// just an experiment, but it gives the same result as __rdtcs()
+static inline uint64_t asm_rdtsc() {
+  uint32_t hi, lo;
+  __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+  return ((uint64_t)lo) | ( ((uint64_t)hi) << 32);
+}
+
 #elif defined(__aarch64__)
-  uint64_t freq;
-  __asm__ volatile("mrs %0, cntfrq_el0" : "=r" (freq));
-  return freq;
-#endif
+
+static inline uint64_t read_os_timer_freq() {
+  // this is nanoseconds https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
+  return 1e9;
 }
 
-static inline unsigned long get_os_timer_freq() {
-  return 0;
-}
-
-static inline unsigned long read_os_timer() {
+static inline uint64_t read_os_timer() {
   return mach_absolute_time();
 }
 
-static inline unsigned long read_cpu_timer() {
-#if defined(__x86_64__)
-  return __rdtsc();
-#elif defined(__aarch64__)
-  uint64_t val;
-  __asm__ volatile("isb;\n\tmrs %0, cntvct_el0" : "=r" (val) :: "memory");
-  return val;
-#endif
+static inline uint64_t read_cpu_freq() {
+  uint64_t freq;
+  __asm__ volatile("mrs %0, cntfrq_el0" : "=r" (freq));
+  return freq;
 }
 
-#if defined(__x86_64__)
-// just an experiment, but it gives the same result as __rdtcs()
-static inline unsigned long asm_rdtsc() {
-  unsigned hi, lo;
-  __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
-
-  return ((unsigned long long)lo) | ( ((unsigned long long)hi) << 32);
+static inline uint64_t read_cpu_timer() {
+  uint64_t value;
+  __asm__ volatile("isb;\n\tmrs %0, cntvct_el0" : "=r" (value) :: "memory");
+  return value;
 }
+
 #endif
 
 #endif // _TIMERS_H_
