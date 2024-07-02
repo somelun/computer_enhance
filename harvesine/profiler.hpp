@@ -10,8 +10,6 @@
 #define PROFILER 0
 #endif
 
-#define READ_BLOCK_TIMER read_os_timer
-
 #ifndef READ_BLOCK_TIMER
 #define READ_BLOCK_TIMER read_cpu_timer
 #endif
@@ -26,6 +24,7 @@ struct ProfileAnchor {
   u64 hit_count;
   u64 processed_byte_count;
   const char* label;
+  u32 parent;
 };
 
 static ProfileAnchor global_anchors[4096];
@@ -39,6 +38,7 @@ struct profile_block {
     label = label_;
 
     ProfileAnchor *anchor = global_anchors + index;
+    anchor->parent = parent;
     old_elapsed_inclusive = anchor->elapsed_inclusive;
     anchor->processed_byte_count += byte_count;
 
@@ -73,35 +73,39 @@ struct profile_block {
 #define NAME_CONCAT(A, B) NAME_CONCAT_NX(A, B)
 #define TIME_BANDWIDTH(Name, ByteCount) profile_block NAME_CONCAT(Block, __LINE__)(Name, __COUNTER__ + 1, ByteCount);
 
-static void PrintTimeElapsed(u64 total_elapsed, ProfileAnchor *anchor) {
+static void PrintTimeElapsed(u64 total_elapsed, u64 timer_freq, ProfileAnchor *anchor) {
   f64 percent = 100.0 * ((f64)anchor->elapsed_exclusive / (f64)total_elapsed);
 
+  if (anchor->parent > 0) {
+    printf("  ");
+  }
   printf("  %s[%lu]: %lu (%.2f%%", anchor->label, anchor->hit_count, anchor->elapsed_exclusive, percent);
 
   if (anchor->elapsed_inclusive != anchor->elapsed_exclusive) {
     f64 percent_with_children = 100.0 * ((f64)anchor->elapsed_inclusive / (f64)total_elapsed);
     printf(", %.2f%% with children", percent_with_children);
   }
-  printf(")\n");
 
-  // if (anchor->processed_byte_count) {
-  //   f64 megabyte = 1024.0f * 1024.0f;
-  //   f64 gigabyte = megabyte * 1024.0f;
-  // 
-  //   f64 seconds = (f64)anchor->elapsed_inclusive / (f64)TimerFreq;
-  //   f64 BytesPerSecond = (f64)Anchor->ProcessedByteCount / Seconds;
-  //   f64 Megabytes = (f64)Anchor->ProcessedByteCount / (f64)Megabyte;
-  //   f64 GigabytesPerSecond = BytesPerSecond / Gigabyte;
-  // 
-  //   printf("  %.3fmb at %.2fgb/s", Megabytes, GigabytesPerSecond);
-  // }
+  if (anchor->processed_byte_count) {
+    f64 megabyte = 1024.0f * 1024.0f;
+    f64 gigabyte = megabyte * 1024.0f;
+
+    f64 seconds = (f64)anchor->elapsed_inclusive / (f64)timer_freq;
+    f64 bytes_per_second = (f64)anchor->processed_byte_count / seconds;
+    f64 megabytes = (f64)anchor->processed_byte_count / (f64)megabyte;
+    f64 gigabytes_per_second = bytes_per_second / gigabyte;
+
+    printf("  %.3fmb at %.2fgb/s", megabytes, gigabytes_per_second);
+  }
+
+  printf(")\n");
 }
 
-static void PrintAnchorData(u64 total_elapsed) {
+static void PrintAnchorData(u64 total_elapsed, u64 timer_freq) {
   for (u32 index = 0; index < ARRAY_COUNT(global_anchors); ++index) {
     ProfileAnchor *anchor = global_anchors + index;
     if (anchor->elapsed_inclusive) {
-      PrintTimeElapsed(total_elapsed, anchor);
+      PrintTimeElapsed(total_elapsed, timer_freq, anchor);
     }
   }
 }
@@ -123,31 +127,6 @@ static Profiler global_profiler;
 #define TIME_BLOCK(Name) TIME_BANDWIDTH(Name, 0)
 #define TIME_FUNC TIME_BLOCK(__func__)
 
-static inline uint64_t estimate_block_freq() {
-  uint64_t milliseconds_to_wait = 100;
-  uint64_t os_freq = read_os_timer_freq();
-
-  uint64_t cpu_start = READ_BLOCK_TIMER();
-  uint64_t os_start = read_os_timer();
-  uint64_t os_end = 0;
-  uint64_t os_elapsed = 0;
-  uint64_t os_wait_time = os_freq * milliseconds_to_wait / 1000;
-
-  while (os_elapsed < os_wait_time) {
-    os_end = read_os_timer();
-    os_elapsed = os_end - os_start;
-  }
-
-  uint64_t cpu_end = READ_BLOCK_TIMER();
-  uint64_t cpu_elapsed = cpu_end - cpu_start;
-
-  uint64_t cpu_freq = 0;
-  if (os_elapsed) {
-    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
-  }
-
-  return cpu_freq;
-}
 
 static void BeginProfile(void) {
   global_profiler.start = READ_BLOCK_TIMER();
@@ -155,15 +134,15 @@ static void BeginProfile(void) {
 
 static void EndAndPrintProfile() {
   global_profiler.end = READ_BLOCK_TIMER();
-  u64 cpu_freq = estimate_block_freq();
+  u64 timer_freq = read_cpu_freq();
 
   u64 total_elapsed = global_profiler.end - global_profiler.start;
 
-  if (cpu_freq > 0) {
-    printf("\nTotal time: %0.4fms (CPU freq %lu)\n", 1000.0 * (f64)total_elapsed / (f64)cpu_freq, cpu_freq);
+  if (timer_freq > 0) {
+    printf("\nTotal time: %0.4fms (Timer freq %lu)\n", 1000.0 * (f64)total_elapsed / (f64)timer_freq, timer_freq);
   }
 
-  PrintAnchorData(total_elapsed);
+  PrintAnchorData(total_elapsed, timer_freq);
 }
 
 #endif // _PROFILER_HPP_

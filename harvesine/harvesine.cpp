@@ -30,7 +30,7 @@ void lexer(const struct Buffer* const buffer, struct TokenItem* tokens);
 struct TokenItem lex_number(const struct Buffer* const buffer, u64* offset);
 
 // tokens parser
-void parser(const struct Buffer* const buffer, const struct TokenItem* const tokens, const u64 tokens_size, struct Coords* pairs);
+u64 parser(const struct Buffer* const buffer, const struct TokenItem* const tokens, const u64 tokens_size, struct Coords* pairs);
 f64 parse_number(const struct Buffer* const buffer, const u64 begin, const u64 end);
 
 // harvesine calculations
@@ -65,9 +65,9 @@ int main(int argc, char* argv[argc +1]) {
   buffer.size = input_stat.st_size;
 
   {
-    TIME_BLOCK("read file")
+    TIME_BANDWIDTH("read file", buffer.size)
     buffer.data = (u8*)malloc(sizeof(u8) * (buffer.size + 1));
-    fread(buffer.data, 1, buffer.size, input);
+    fread(buffer.data, buffer.size, 1, input);
     fclose(input);
   }
 
@@ -78,24 +78,30 @@ int main(int argc, char* argv[argc +1]) {
 
   struct TokenItem* tokens = (TokenItem*)malloc(sizeof(struct TokenItem) * count);
 
-  u64 pairs_count = count / 4;
-  struct Coords* pairs = (Coords*)malloc(sizeof(struct Coords) * pairs_count);
+  u64 max_pairs_count = count / 4;
+  struct Coords* pairs = (Coords*)malloc(sizeof(struct Coords) * max_pairs_count);
 
   lexer(&buffer, tokens);
 
-  parser(&buffer, tokens, count, pairs);
+  u64 pairs_count = parser(&buffer, tokens, count, pairs);
 
   f64 average = 0.0f;
   u64 average_count = 0;
-  for (u64 i = 0; i < pairs_count; ++i) {
+  {
+    TIME_BANDWIDTH("harvesine sum", pairs_count * sizeof(Coords))
+    for (u64 i = 0; i < pairs_count; ++i) {
       f64 answer = reference_haversine(pairs[i].a, pairs[i].b, pairs[i].c, pairs[i].d, EARTH_RADIUS);
       if (answer > 0.0) {
         average += answer;
         average_count++;
       }
+    }
   }
 
   average = average / average_count;
+  printf("\n");
+  printf("Input size: %lu\n", buffer.size);
+  printf("Pairs count: %lu\n", pairs_count);
   printf("Harvesine distance is %f\n", average);
 
   {
@@ -159,7 +165,7 @@ struct TokenItem lex_number(const struct Buffer* const buffer, u64* offset) {
   return token_item;
 }
 
-void parser(const struct Buffer* const buffer, const struct TokenItem* const tokens,const u64 tokens_size, struct Coords* pairs) {
+u64 parser(const struct Buffer* const buffer, const struct TokenItem* const tokens,const u64 tokens_size, struct Coords* pairs) {
   TIME_FUNC;
 
   struct Coords coords;
@@ -189,11 +195,14 @@ void parser(const struct Buffer* const buffer, const struct TokenItem* const tok
 
     if (counter == 4) {
       counter = 0;
-      pairs[n++] = coords;
-      // f64 answer = reference_haversine(coords.a, coords.b, coords.c, coords.d, EARTH_RADIUS);
-      // printf("%f %f %f %f %f\n", coords.a, coords.b, coords.c, coords.d, answer);
+      // slow place
+      if (coords.a + coords.b + coords.c + coords.d != 0.0f) {
+        pairs[n++] = coords;
+      }
     }
   }
+
+  return n;
 }
 
 f64 parse_number(const struct Buffer* const buffer, const u64 begin, const u64 end) {
@@ -239,8 +248,6 @@ f64 reference_haversine(f64 x0, f64 y0, f64 x1, f64 y1, f64 earth_radius) {
   // NOTE(casey): This is not meant to be a "good" way to calculate the Haversine distance.
   //  Instead, it attempts to follow, as closely as possible, the formula used in the real-world
   //  question on which these homework exercises are loosely based.
-
-  TIME_FUNC;
 
   f64 lat1 = y0;
   f64 lat2 = y1;

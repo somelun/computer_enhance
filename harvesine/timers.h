@@ -49,8 +49,9 @@ static inline uint64_t asm_rdtsc() {
 #elif defined(__aarch64__)
 
 static inline uint64_t read_os_timer_freq() {
-  // this is nanoseconds https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
-  return 1e9;
+  // documetation says its a nanoseconds https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
+  // I don't trust it
+  return 1e6;
 }
 
 static inline uint64_t read_os_timer() {
@@ -70,6 +71,33 @@ static inline uint64_t read_cpu_timer() {
 }
 
 #endif
+
+// not used by me
+static inline uint64_t estimate_block_freq() {
+  uint64_t milliseconds_to_wait = 100;
+  uint64_t os_freq = read_os_timer_freq();
+
+  uint64_t cpu_start = read_cpu_timer();
+  uint64_t os_start = read_os_timer();
+  uint64_t os_end = 0;
+  uint64_t os_elapsed = 0;
+  uint64_t os_wait_time = os_freq * milliseconds_to_wait / 1000;
+
+  while (os_elapsed < os_wait_time) {
+    os_end = read_os_timer();
+    os_elapsed = os_end - os_start;
+  }
+
+  uint64_t cpu_end = read_cpu_timer();
+  uint64_t cpu_elapsed = cpu_end - cpu_start;
+
+  uint64_t cpu_freq = 0;
+  if (os_elapsed) {
+    cpu_freq = os_freq * cpu_elapsed / os_elapsed;
+  }
+
+  return cpu_freq;
+}
 
 #endif // _TIMERS_H_
 
