@@ -51,7 +51,7 @@ static inline uint64_t asm_rdtsc() {
 static inline uint64_t read_os_timer_freq() {
   // documetation says its a nanoseconds https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
   // I don't trust it
-  return 1e6;
+  return 1e9;
 }
 
 static inline uint64_t read_os_timer() {

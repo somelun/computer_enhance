@@ -1,11 +1,11 @@
 build:
-	clang++ -Wall harvesine.cpp -o harvesine
+	clang++ -Wall -std=c++11 harvesine.cpp -o harvesine
 
 run:
 	./harvesine
 
 generator:
-	clang -Wall generator.c -o generator
+	clang -Wall -std=c++11 generator.c -o generator
 
 clean:
 	rm harvesine

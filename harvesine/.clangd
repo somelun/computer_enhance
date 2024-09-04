@@ -1,0 +1,12 @@
+If:
+  PathExclude: [.*\.c, .*\.h, .*\.cpp, .*\.hpp]
+CompileFlags:
+  Add: ["-std=c++17"]
+
+---
+
+If:
+  PathMatch: .*\.c
+
+CompileFlags:
+  Add: [-std=c17]
