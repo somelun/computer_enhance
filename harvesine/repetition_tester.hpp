@@ -72,7 +72,7 @@ static void print_results(RepTestResults results, u64 cpu_timer_freq, u64 byte_c
 
   if (results.test_count) {
     print_time("Avg", (f64)results.total_time / (f64)results.test_count, cpu_timer_freq, byte_count);
-    printf("\n");
+    printf("\n\n");
   }
 }
 
@@ -120,7 +120,7 @@ static void count_bytes(RepTester *tester, u64 byte_count) {
 
 static bool is_testing(RepTester *tester) {
   if (tester->test_mode == RepTestMode::Testing) {
-    u64 CurrentTime = read_cpu_timer();
+    u64 current_time = read_cpu_timer();
 
     if (tester->open_block_count) { // NOTE(casey): We don't count tests that had no timing blocks - we assume they took some other path
       if (tester->open_block_count != tester->close_block_count) {
@@ -133,19 +133,18 @@ static bool is_testing(RepTester *tester) {
 
       if (tester->test_mode == RepTestMode::Testing) {
         RepTestResults *results = &tester->results;
-        u64 ElapsedTime = tester->time_accumulated_on_this_test;
+        u64 elapsed_time = tester->time_accumulated_on_this_test;
         results->test_count += 1;
-        results->total_time += ElapsedTime;
+        results->total_time += elapsed_time;
 
-        if (results->max_time < ElapsedTime) {
-          results->max_time = ElapsedTime;
+        if (results->max_time < elapsed_time) {
+          results->max_time = elapsed_time;
         }
 
-        if (results->min_time > ElapsedTime) {
-          results->min_time = ElapsedTime;
+        if (results->min_time > elapsed_time) {
+          results->min_time = elapsed_time;
 
-          // NOTE(casey): Whenever we get a new minimum time, we reset the clock to the full trial time
-          tester->tests_started_at = CurrentTime;
+          tester->tests_started_at = current_time;
 
           if (tester->print_new_minimums) {
             print_time("Min", results->min_time, tester->cpu_timer_freq, tester->bytes_accumulated_on_this_test);
@@ -160,7 +159,7 @@ static bool is_testing(RepTester *tester) {
       }
     }
 
-    if ((CurrentTime - tester->tests_started_at) > tester->try_for_time) {
+    if ((current_time - tester->tests_started_at) > tester->try_for_time) {
       tester->test_mode = RepTestMode::Completed;
 
       printf("                                                          \r");

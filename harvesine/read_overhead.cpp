@@ -71,7 +71,7 @@ TestFunction testFunctions[] = {
 };
 
 int main(int argc, char **argv) {
-  u64 cpu_freq = read_cpu_freq();//estimate_block_freq();
+  u64 cpu_freq = read_cpu_timer_freq(); //estimate_block_freq();
 
   if (argc == 2) {
     char* file_name = argv[1];
@@ -82,10 +82,16 @@ int main(int argc, char **argv) {
     params.destination = allocate_buffer(input_stat.st_size);
     params.file_name = file_name;
 
+    printf("\n");
+
     if (params.destination.count > 0) {
       RepTester testers[ARRAY_COUNT(testFunctions)] = {};
-
+      u64 it = 0;
       for (;;) {
+        printf("%-20s %lu\n", "Iteration:", ++it);
+        printf("%-20s %-4.2f MHz\n", "CPU Frequency:", cpu_freq * 1e-6f);
+        printf("%-20s %llu bytes\n", "File size:", input_stat.st_size);
+
         for (u32 func_index = 0; func_index < ARRAY_COUNT(testFunctions); ++func_index) {
           RepTester *tester = testers + func_index;
           TestFunction test_func = testFunctions[func_index];

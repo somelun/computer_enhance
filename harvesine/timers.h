@@ -24,7 +24,7 @@ static inline uint64_t read_os_timer() {
   return value.QuadPart;
 }
 
-static inline uint64_t read_cpu_freq() {
+static inline uint64_t read_cpu_timer_freq() {
   uint64_t freq = 0;
   size_t size = sizeof(freq);
 
@@ -50,7 +50,6 @@ static inline uint64_t asm_rdtsc() {
 
 static inline uint64_t read_os_timer_freq() {
   // documetation says its a nanoseconds https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
-  // I don't trust it
   return 1e9;
 }
 
@@ -58,7 +57,7 @@ static inline uint64_t read_os_timer() {
   return mach_absolute_time();
 }
 
-static inline uint64_t read_cpu_freq() {
+static inline uint64_t read_cpu_timer_freq() {
   uint64_t freq;
   __asm__ volatile("mrs %0, cntfrq_el0" : "=r" (freq));
   return freq;

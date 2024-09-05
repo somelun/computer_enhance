@@ -134,7 +134,7 @@ static void BeginProfile(void) {
 
 static void EndAndPrintProfile() {
   global_profiler.end = READ_BLOCK_TIMER();
-  u64 timer_freq = read_cpu_freq();
+  u64 timer_freq = read_cpu_timer_freq();
 
   u64 total_elapsed = global_profiler.end - global_profiler.start;
 
