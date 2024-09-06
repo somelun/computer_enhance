@@ -64,14 +64,14 @@ static void print_time(char const *label, u64 cpu_time, u64 cpu_timer_freq, u64 
 }
 
 static void print_results(RepTestResults results, u64 cpu_timer_freq, u64 byte_count) {
-  print_time("Min", (f64)results.min_time, cpu_timer_freq, byte_count);
+  print_time("min", (f64)results.min_time, cpu_timer_freq, byte_count);
   printf("\n");
 
-  print_time("Max", (f64)results.max_time, cpu_timer_freq, byte_count);
+  print_time("max", (f64)results.max_time, cpu_timer_freq, byte_count);
   printf("\n");
 
   if (results.test_count) {
-    print_time("Avg", (f64)results.total_time / (f64)results.test_count, cpu_timer_freq, byte_count);
+    print_time("avg", (f64)results.total_time / (f64)results.test_count, cpu_timer_freq, byte_count);
     printf("\n\n");
   }
 }
@@ -146,10 +146,10 @@ static bool is_testing(RepTester *tester) {
 
           tester->tests_started_at = current_time;
 
-          if (tester->print_new_minimums) {
-            print_time("Min", results->min_time, tester->cpu_timer_freq, tester->bytes_accumulated_on_this_test);
-            printf("               \r");
-          }
+          // if (tester->print_new_minimums) {
+          //   print_time("min", results->min_time, tester->cpu_timer_freq, tester->bytes_accumulated_on_this_test);
+          //   printf("               \r");
+          // }
         }
 
         tester->open_block_count = 0;
@@ -162,7 +162,7 @@ static bool is_testing(RepTester *tester) {
     if ((current_time - tester->tests_started_at) > tester->try_for_time) {
       tester->test_mode = RepTestMode::Completed;
 
-      printf("%-6s | %8s | %10s | %10s \n", "Stat", "counts", "time (ms)", "speed (gb/s)");
+      printf("%-6s | %8s | %10s | %10s \n", "stat", "counts", "time (ms)", "speed (gb/s)");
       printf("----------------------------------------------\n");
       print_results(tester->results, tester->cpu_timer_freq, tester->target_processed_byte_count);
     }
