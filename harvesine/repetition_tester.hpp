@@ -46,15 +46,15 @@ static f64 seconds_from_cpu_time(f64 cpu_time, u64 cpu_timer_freq) {
 }
 
 static void print_time(char const *label, f64 cpu_time, u64 cpu_timer_freq, u64 byte_count) {
-  printf("%s: %.0f", label, cpu_time);
+  printf("%-6s | %8.0f", label, cpu_time);
   if (cpu_timer_freq) {
     f64 seconds = seconds_from_cpu_time(cpu_time, cpu_timer_freq);
-    printf(" (%fms)", 1000.0f*seconds);
+    printf(" | %10f", 1000.0f*seconds);
 
     if (byte_count) {
       f64 gigabyte = (1024.0f * 1024.0f * 1024.0f);
       f64 best_bandwidth = byte_count / (gigabyte * seconds);
-      printf(" %fgb/s", best_bandwidth);
+      printf(" | %10f", best_bandwidth);
     }
   }
 }
@@ -162,7 +162,8 @@ static bool is_testing(RepTester *tester) {
     if ((current_time - tester->tests_started_at) > tester->try_for_time) {
       tester->test_mode = RepTestMode::Completed;
 
-      printf("                                                          \r");
+      printf("%-6s | %8s | %10s | %10s \n", "Stat", "counts", "time (ms)", "speed (gb/s)");
+      printf("----------------------------------------------\n");
       print_results(tester->results, tester->cpu_timer_freq, tester->target_processed_byte_count);
     }
   }
